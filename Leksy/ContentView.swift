@@ -9,77 +9,40 @@ import SwiftUI
 import CoreData
 
 struct ContentView: View {
-    @Environment(\.managedObjectContext) private var viewContext
 
-    @FetchRequest(
-        sortDescriptors: [NSSortDescriptor(keyPath: \Item.timestamp, ascending: true)],
-        animation: .default)
-    private var items: FetchedResults<Item>
+    @AppStorage("hasCompletedSetup") private var hasCompletedSetup: Bool = false
+    @AppStorage("hasCompletedLanguageDownload") private var hasCompletedLanguageDownload: Bool = false
+    @AppStorage("hasCompletedCardCreation") private var hasCompletedCardCreation: Bool = false
 
-    var body: some View {
-        NavigationView {
-            List {
-                ForEach(items) { item in
-                    NavigationLink {
-                        Text("Item at \(item.timestamp!, formatter: itemFormatter)")
-                    } label: {
-                        Text(item.timestamp!, formatter: itemFormatter)
-                    }
-                }
-                .onDelete(perform: deleteItems)
-            }
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    EditButton()
-                }
-                ToolbarItem {
-                    Button(action: addItem) {
-                        Label("Add Item", systemImage: "plus")
-                    }
-                }
-            }
-            Text("Select an item")
-        }
+    init() {
+        UserDefaults.standard.removePersistentDomain(forName: Bundle.main.bundleIdentifier!)
     }
 
-    private func addItem() {
-        withAnimation {
-            let newItem = Item(context: viewContext)
-            newItem.timestamp = Date()
-
-            do {
-                try viewContext.save()
-            } catch {
-                // Replace this implementation with code to handle the error appropriately.
-                // fatalError() causes the application to generate a crash log and terminate. You should not use this function in a shipping application, although it may be useful during development.
-                let nsError = error as NSError
-                fatalError("Unresolved error \(nsError), \(nsError.userInfo)")
+        var body: some View {
+            Group {
+                if !hasCompletedSetup {
+                    LanguageSetupView(onSetupComplete: {
+                        hasCompletedSetup = true
+                    })
+                } else if !hasCompletedLanguageDownload {
+                    LanguageDownloadView(onComplete: {
+                        triggerHaptic(style: .medium)
+                        hasCompletedLanguageDownload = true
+                    })
+                } else if !hasCompletedCardCreation {
+                    CreateCardsScreen(onComplete: {
+                        triggerHaptic(style: .medium)
+                        hasCompletedCardCreation = true
+                    })
+                } else {
+                    HomeScreen()
+                }
             }
+            .animation(.default, value: hasCompletedSetup)
+            .animation(.default, value: hasCompletedLanguageDownload)
+            .animation(.default, value: hasCompletedCardCreation)
         }
-    }
-
-    private func deleteItems(offsets: IndexSet) {
-        withAnimation {
-            offsets.map { items[$0] }.forEach(viewContext.delete)
-
-            do {
-                try viewContext.save()
-            } catch {
-                // Replace this implementation with code to handle the error appropriately.
-                // fatalError() causes the application to generate a crash log and terminate. You should not use this function in a shipping application, although it may be useful during development.
-                let nsError = error as NSError
-                fatalError("Unresolved error \(nsError), \(nsError.userInfo)")
-            }
-        }
-    }
 }
-
-private let itemFormatter: DateFormatter = {
-    let formatter = DateFormatter()
-    formatter.dateStyle = .short
-    formatter.timeStyle = .medium
-    return formatter
-}()
 
 #Preview {
     ContentView().environment(\.managedObjectContext, PersistenceController.preview.container.viewContext)
